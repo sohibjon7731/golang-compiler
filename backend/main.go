@@ -20,6 +20,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/check", controllers.CheckSyntax)
 	mux.HandleFunc("/compile", controllers.CompileHandler)
+	mux.HandleFunc("/format", controllers.FormatHandler)
 
 	handler := c.Handler(mux)
 	fmt.Println("Server running on http://localhost:8080")
