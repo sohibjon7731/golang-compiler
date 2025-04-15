@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Code Editor</title>
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.2/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            const [code, setCode] = useState(`package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello, World!")\n}`);
+            const [output, setOutput] = useState('');
+            const [error, setError] = useState('');
+            const editorRef = useRef(null);
+            const monacoRef = useRef(null);
+
+            useEffect(() => {
+                require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+                require(['vs/editor/editor.main'], () => {
+                    monacoRef.current = monaco;
+                    editorRef.current = monaco.editor.create(document.getElementById('editor'), {
+                        value: code,
+                        language: 'go',
+                        theme: 'vs-dark',
+                        automaticLayout: true,
+                    });
+
+                    editorRef.current.onDidChangeModelContent(() => {
+                        setCode(editorRef.current.getValue());
+                    });
+                });
+
+                return () => {
+                    if (editorRef.current) {
+                        editorRef.current.dispose();
+                    }
+                };
+            }, []);
+
+            const checkSyntax = async () => {
+                try {
+                    const response = await fetch('http://localhost:8080/check', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code }),
+                    });
+                    const result = await response.json();
+                    setError(result.error || '');
+                    setOutput(result.error ? '' : 'Syntax is valid');
+                } catch (err) {
+                    console.log(err)
+                    setError('Failed to connect to server');
+                    setOutput('');
+                }
+            };
+
+            const compileCode = async () => {
+                try {
+                    const response = await fetch('http://localhost:8080/compile', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code }),
+                    });
+                    const result = await response.json();
+                    setOutput(result.output || '');
+                    setError(result.error || '');
+                } catch (err) {
+                    setError('Failed to connect to server');
+                    setOutput('');
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+                    <header className="p-4 bg-gray-800 shadow">
+                        <h1 className="text-2xl font-bold">Go Code Editor</h1>
+                    </header>
+                    <main className="flex-1 p-4 flex flex-col gap-4">
+                        <div id="editor" className="h-96 border border-gray-700 rounded"></div>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={checkSyntax}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
+                            >
+                                Check Syntax
+                            </button>
+                            <button
+                                onClick={compileCode}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition"
+                            >
+                                Compile & Run
+                            </button>
+                        </div>
+                        <div className="mt-4">
+                            <h2 className="text-xl font-semibold">Output:</h2>
+                            <pre className="p-4 bg-gray-800 rounded mt-2">
+                                {output && <span className="text-green-400">{output}</span>}
+                                {error && <span className="text-red-400">{error}</span>}
+                            </pre>
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>
